@@ -25,6 +25,7 @@ benchmark/  (chạy retrieval/pipeline.py trên eval set → chấm điểm bằ
 ```
 
 Legal Knowledge Graph gồm các loại node chính:
+
 - **Norm**: văn bản pháp luật (Luật, Nghị định, Thông tư...).
 - **Component**: đơn vị cấu trúc bên trong văn bản (Phần/Chương/Mục/Tiểu mục/Điều/Khoản/Điểm), quan hệ `CONTAINS` lồng nhau.
 - **TextUnit**: nội dung văn bản gắn với Component (`type='noi_dung'`), được embed để phục vụ vector search.
@@ -83,7 +84,7 @@ MAX_COMPONENTS=3
 MAX_CHARS_PER_UNIT=1000
 MAX_PROMPT_TOKENS=6000
 USE_RERANK=true
-RERANK_MIN_SCORE=4.0
+RERANK_MIN_SCORE=0.0
 ```
 
 ## 4. Quy trình sử dụng
@@ -137,6 +138,7 @@ python -m benchmark.run_benchmark \
 ```
 
 Kết quả:
+
 - `benchmark/results/benchmark_results.csv` — chi tiết từng (câu hỏi, mode).
 - `benchmark/results/benchmark_summary.csv` — trung bình theo mode (`answer_relevancy`, `faithfulness_deepeval`, `contextual_relevancy`, `context_len_chars`, `prompt_tokens`, `latency_sec`).
 
@@ -145,4 +147,3 @@ Xem thêm cờ `--include-reason` để DeepEval sinh giải thích cho từng m
 ## 5. Tài liệu liên quan
 
 - [`RETRIEVAL_BENCHMARK.md`](./RETRIEVAL_BENCHMARK.md) — mô tả chi tiết pipeline retrieval (4 mode, input/output/ý nghĩa từng hàm) và pipeline benchmark (DeepEval + metric cần ground truth).
-- [`RETRIEVAL.md`](./RETRIEVAL.md) — bản mô tả pipeline retrieval theo dạng step-by-step (gốc).

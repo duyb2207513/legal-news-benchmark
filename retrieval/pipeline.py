@@ -1,17 +1,17 @@
 """Ráp toàn bộ module retrieval/ thành 2 hàm dùng trực tiếp:
-
+ 
 - retrieve(question, mode): chỉ lấy seeds (Component) — dùng khi chỉ cần
   test/benchmark chất lượng retrieval, chưa cần sinh câu trả lời.
 - run_pipeline(question, mode): retrieve + build context + sinh câu trả
   lời — hàm end-to-end dùng cho cả app thật lẫn benchmark/run_benchmark.py.
-
+ 
 4 mode:
 - "vector":   chỉ vector search (embedding similarity)
 - "bm25":     chỉ BM25 (từ khoá chính xác)
 - "hybrid":   vector + BM25 (trên từ khoá đã trích) hợp nhất qua RRF
 - "graphrag": giống hybrid, nhưng build context có mở rộng qua graph
               (Norm cha, Action sửa đổi/bị sửa đổi) thay vì context phẳng
-
+ 
 Quan trọng:
 - 1 lần gọi run_pipeline() chỉ mở 1 Neo4jClient (1 driver) dùng chung cho
   cả vector_search lẫn expand_graph — tránh mở/đóng driver lặp lại.
