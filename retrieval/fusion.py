@@ -13,13 +13,20 @@ BM25F) ở bất kỳ bước nào khác của hàm này (chọn dòng đại di
 from __future__ import annotations
 
 
-def merge_search_results(*result_lists: list[dict], k: int = 60) -> list[dict]:
+def merge_search_results(
+    *result_lists: list[dict],
+    k: int = 60,
+    weights: tuple[float, ...] = (0.55, 0.45),
+) -> list[dict]:
     """Hợp nhất nhiều list kết quả (mỗi list đã sort theo score giảm dần)
-    bằng RRF: rrf(row) = sum(1 / (k + rank_i)) qua các nguồn i chứa row.
+    bằng weighted RRF: rrf(row) = sum(weight_i / (k + rank_i)) qua các
+    nguồn i chứa row.
 
-    Nguồn đầu tiên (result_lists[0], quy ước là vector search) được thưởng
-    hệ số 1.2 — vector search thường có precision cao hơn BM25 cho câu hỏi
-    tự nhiên (so với từ khoá), nên ưu tiên nhẹ khi 2 nguồn đồng thuận.
+    Nguồn đầu tiên (result_lists[0], quy ước là vector search) và nguồn
+    thứ hai (BM25) được nhân trọng số theo `weights` (mặc định 0.6/0.4) —
+    vector search thường có precision cao hơn BM25 cho câu hỏi tự nhiên
+    (so với từ khoá), nên ưu tiên khi 2 nguồn đồng thuận. Nếu có nhiều hơn
+    len(weights) nguồn, các nguồn dư dùng weight=1.0 (không boost/giảm).
 
     Dòng đại diện cho mỗi Component: chọn dòng có RANK tốt nhất (nhỏ nhất)
     trong nguồn của nó — không so sánh raw score giữa 2 nguồn (khác thang,
@@ -41,9 +48,8 @@ def merge_search_results(*result_lists: list[dict], k: int = 60) -> list[dict]:
             comp_id = row.get("comp_id")
             if not comp_id:
                 continue
-            rrf = 1.0 / (k + rank)
-            if source_idx == 0:  # nguồn đầu tiên (vector) được thưởng nhẹ
-                rrf *= 1.2
+            weight = weights[source_idx] if source_idx < len(weights) else 1.0
+            rrf = weight / (k + rank)
             rrf_scores[comp_id] = rrf_scores.get(comp_id, 0) + rrf
 
             # Chọn dòng đại diện + best_rank theo RANK (so sánh công bằng
@@ -61,7 +67,7 @@ def merge_search_results(*result_lists: list[dict], k: int = 60) -> list[dict]:
         row["best_rank"] = best_rank[comp_id]
         merged.append(row)
 
-    merged.sort(key=lambda r: (r.get("validity_status") != "Còn hiệu lực", -r["score"], r["best_rank"]))
+    # merged.sort(key=lambda r: (r.get("validity_status") != "Còn hiệu lực", -r["score"], r["best_rank"]))
 
     filtered, seen = [], set()
     for row in merged:

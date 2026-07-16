@@ -5,12 +5,14 @@
 - run_pipeline(question, mode): retrieve + build context + sinh câu trả
   lời — hàm end-to-end dùng cho cả app thật lẫn benchmark/run_benchmark.py.
  
-4 mode:
-- "vector":   chỉ vector search (embedding similarity)
-- "bm25":     chỉ BM25 (từ khoá chính xác)
-- "hybrid":   vector + BM25 (trên từ khoá đã trích) hợp nhất qua RRF
-- "graphrag": giống hybrid, nhưng build context có mở rộng qua graph
-              (Norm cha, Action sửa đổi/bị sửa đổi) thay vì context phẳng
+5 mode:
+- "vector":       chỉ vector search (embedding similarity)
+- "bm25":         chỉ BM25 (từ khoá chính xác)
+- "hybrid":       vector + BM25 (trên từ khoá đã trích) hợp nhất qua RRF
+- "graphrag":     giống hybrid, nhưng build context có mở rộng qua graph
+                  (Norm cha, Action sửa đổi/bị sửa đổi) thay vì context phẳng
+- "vector_graph": giống "vector" ở bước retrieve (chỉ vector search), nhưng
+                  build context có mở rộng qua graph giống "graphrag"
  
 Quan trọng:
 - 1 lần gọi run_pipeline() chỉ mở 1 Neo4jClient (1 driver) dùng chung cho
@@ -23,7 +25,6 @@ Quan trọng:
   vẫn giữ nguyên — tự tính bên trong.
 """
 from __future__ import annotations
-from retrieval.context_builder import _validity_sort_key
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -60,8 +61,8 @@ def retrieve(
     """Trả về tối đa `max_components` Component liên quan nhất.
 
     embedding/keywords: nếu đã tính sẵn ở caller (vd benchmark tính 1 lần
-    cho cả 3 mode dùng chung câu hỏi), truyền vào để bỏ qua việc gọi lại
-    embed_question()/extract_legal_keywords() — 2 lệnh gọi API/LLM tốn
+    cho cả nhiều mode dùng chung câu hỏi), truyền vào để bỏ qua việc gọi
+    lại embed_question()/extract_legal_keywords() — 2 lệnh gọi API/LLM tốn
     nhất trong bước retrieve. Nếu không truyền, hàm tự tính như cũ.
 
     mode="hybrid"/"graphrag": nếu cả embedding lẫn keywords đều chưa có,
@@ -77,7 +78,7 @@ def retrieve(
     Validity_status vẫn ưu tiên sau cùng: rerank chọn candidate liên quan,
     rồi trong số đó văn bản "Còn hiệu lực" được xếp lên đầu.
     """
-    if mode == "vector":
+    if mode in ("vector", "vector_graph"):
         embedding = embedding if embedding is not None else embed_question(question)
         seeds = vector_search(embedding, top_k, client=client)
 
@@ -118,9 +119,11 @@ def retrieve(
     # "score" khi use_rerank=False (không có rerank_score) để giữ hành vi cũ.
     seeds = sorted(
         seeds,
-        key=lambda r: (_validity_sort_key(r.get("validity_status")), -r.get("rerank_score", r.get("score", 0))),
+        key=lambda r: -r.get("rerank_score", r.get("score", 0)),
     )
     return seeds[:max_components]
+
+
 def run_pipeline(
     question: str,
     mode: str,
@@ -131,6 +134,7 @@ def run_pipeline(
     client: Neo4jClient | None = None,
     embedding: list[float] | None = None,
     keywords: str | None = None,
+    use_rerank: bool = USE_RERANK,
 ) -> dict:
     """End-to-end: retrieve → build context (flat hoặc graph tuỳ mode) →
     cắt bớt context nếu vượt max_tokens → sinh câu trả lời.
@@ -144,6 +148,9 @@ def run_pipeline(
     embedding/keywords: xem docstring retrieve() — truyền vào để tái sử
     dụng giữa các mode của cùng 1 câu hỏi, tránh gọi lại API embedding/LLM.
 
+    use_rerank: mặc định lấy theo config.USE_RERANK (biến môi trường), có
+    thể override riêng cho lần gọi này (vd use_rerank=False để tắt hẳn).
+
     Trả dict gồm answer, context, retrieved (seeds thô — để tính recall/mrr
     trong benchmark/metrics.py), prompt_tokens, latency_sec.
     """
@@ -154,12 +161,25 @@ def run_pipeline(
     try:
         seeds = retrieve(
             question, mode, top_k, max_components,
-            client=client, embedding=embedding, keywords=keywords,
+            client=client, embedding=embedding, keywords=keywords, use_rerank=use_rerank,
         )
 
-        if mode == "graphrag":
+        if mode in ("graphrag", "vector_graph"):
             component_ids = [row["comp_id"] for row in seeds if row.get("comp_id")]
             subgraph = expand_graph(component_ids, client=client)
+
+            # expand_graph() truy vấn lại Neo4j theo comp_id -> KHÔNG mang
+            # theo rerank_score/score đã tính ở retrieve(). Gắn lại thủ công
+            # theo comp_id để build_context_graph() giữ đúng thứ tự liên
+            # quan, không phải thứ tự ngẫu nhiên trả về từ Neo4j.
+            seed_by_comp_id = {row["comp_id"]: row for row in seeds if row.get("comp_id")}
+            for item in subgraph:
+                comp_id = (item.get("c") or {}).get("comp_id")
+                seed_row = seed_by_comp_id.get(comp_id)
+                if seed_row:
+                    item["rerank_score"] = seed_row.get("rerank_score")
+                    item["score"] = seed_row.get("score")
+
             context = build_context_graph(subgraph, max_chars)
         else:
             context = build_context_flat(seeds, max_chars)

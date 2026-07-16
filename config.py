@@ -39,7 +39,7 @@ for _dir in (RAW_DIR, TRANSFORMED_DIR, EMBEDDED_DIR, BM25_DIR):
 # lọc — đây là thay đổi so với baseline dùng để benchmark 4 mode cũ, nên
 # nếu cần so sánh lại với baseline thì set TOP_K=5 qua .env.
 TOP_K = int(os.getenv("TOP_K", "15"))
-MAX_COMPONENTS = int(os.getenv("MAX_COMPONENTS", "3"))
+MAX_COMPONENTS = int(os.getenv("MAX_COMPONENTS", "5"))
 MAX_CHARS_PER_UNIT = int(os.getenv("MAX_CHARS_PER_UNIT", "1000"))
 MAX_PROMPT_TOKENS = int(os.getenv("MAX_PROMPT_TOKENS", "6000"))
 BM25_BACKEND = os.getenv("BM25_BACKEND", "whoosh")

@@ -1,3 +1,4 @@
-﻿mode,answer_relevancy,faithfulness_deepeval,contextual_relevancy,context_len_chars,prompt_tokens,latency_sec
+mode,answer_relevancy,faithfulness_deepeval,contextual_relevancy,context_len_chars,prompt_tokens,latency_sec
 hybrid,0.9,0.961,0.193,15047.75,5432.7,11.664
 vector,0.903,0.952,0.211,14537.1,5262.45,11.282
+graphrag,0.887,0.972,0.208,15154.8,5468.2,13.124
