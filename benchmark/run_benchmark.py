@@ -1,6 +1,6 @@
 """Entrypoint benchmark: python -m benchmark.run_benchmark --eval-set ...
 
-So sánh 4 mode retrieval (bm25/vector/hybrid/graphrag) trên cùng 1 EVAL_SET,
+So sánh 5 mode retrieval (bm25/vector/hybrid/graphrag/vector_graph) trên cùng 1 EVAL_SET,
 chấm bằng DeepEval (answer_relevancy, faithfulness, contextual_relevancy —
 không cần ground truth), gộp thành bảng, lưu CSV vào benchmark/results/.
 """
@@ -12,6 +12,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+import ast
 import pandas as pd
 
 from benchmark.deepeval_judge import score_with_deepeval
@@ -20,7 +21,7 @@ from retrieval.pipeline import run_pipeline
 
 logger = logging.getLogger(__name__)
 
-MODES = ["bm25", "vector", "hybrid", "graphrag"]
+MODES = ["bm25", "vector", "hybrid", "graphrag", "vector_graph"]
 
 RESULTS_DIR = Path(__file__).parent / "results"
 
@@ -57,6 +58,31 @@ def load_precomputed_results(path: str | Path) -> dict[str, dict]:
     return lookup
 
 
+def _parse_precomputed(items: list[str]) -> dict[str, str]:
+    """Parse list "mode=path.csv" -> {mode: path}. Raise nếu format sai."""
+    result = {}
+    for item in items or []:
+        if "=" not in item:
+            raise ValueError(f"--precomputed phải dạng mode=path.csv, nhận: {item!r}")
+        mode, path = item.split("=", 1)
+        result[mode] = path
+    return result
+
+
+def _load_precomputed_result(path: str, question: str) -> dict | None:
+    """Đọc 1 dòng result đã chạy sẵn từ CSV (khớp theo question), trả về
+    None nếu không tìm thấy — caller sẽ tự fallback chạy run_pipeline()."""
+    df = pd.read_csv(path, encoding="utf-8-sig")
+    matched = df[df["question"] == question]
+    if matched.empty:
+        return None
+    row = matched.iloc[0]
+    result = row["result"] if "result" in row else row.to_dict()
+    if isinstance(result, str):
+        result = ast.literal_eval(result)
+    return result
+
+
 def _run_one_question(
     item: dict,
     modes: list[str],
@@ -84,7 +110,7 @@ def _run_one_question(
             result = cached
         else:
             logger.info("Chạy mode=%s cho câu hỏi: %s...", mode, question[:80])
-            result = run_pipeline(question, mode)
+            result = run_pipeline(question, mode,max_components=5,top_k=5, use_rerank=False)
         deepeval_scores = score_with_deepeval(result, include_reason=include_reason)
 
         rows.append({
@@ -167,7 +193,7 @@ def summarize_by_category(df_results: pd.DataFrame) -> pd.DataFrame | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Benchmark 4 mode retrieval (bm25/vector/hybrid/graphrag) bằng DeepEval")
+    parser = argparse.ArgumentParser(description="Benchmark 5 mode retrieval (bm25/vector/hybrid/graphrag/vector_graph) bằng DeepEval")
     parser.add_argument("--eval-set", required=True, help="Path jsonl EVAL_SET (xem benchmark/eval_set.py)")
     parser.add_argument("--modes", nargs="+", default=MODES, choices=MODES)
     parser.add_argument("--out-dir", default=str(RESULTS_DIR))

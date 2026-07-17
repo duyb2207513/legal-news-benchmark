@@ -17,7 +17,7 @@ GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
 LLM_MODEL_HEAVY = os.getenv("LLM_MODEL_HEAVY", "gemini-3.5-flash")
-LLM_MODEL_LIGHT = os.getenv("LLM_MODEL_LIGHT", "gemini-2.5-flash")
+LLM_MODEL_LIGHT = os.getenv("LLM_MODEL_LIGHT", "gemini-3.1-flash-lite")
 
 # --- Hugging Face dataset ---
 HF_DATASET_REPO = os.getenv("HF_DATASET_REPO", "th1nhng0/vietnamese-legal-documents")
