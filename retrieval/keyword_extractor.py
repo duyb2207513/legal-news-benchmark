@@ -25,24 +25,6 @@ def _get_llm() -> ChatVertexAI:
     return _llm
 
 
-# def extract_legal_keywords(question: str, llm: ChatVertexAI | None = None) -> str:
-#     """Trả về chuỗi 3-6 từ khoá pháp lý cách nhau bởi dấu cách.
-
-#     Fallback: trả nguyên câu hỏi gốc nếu LLM lỗi (timeout, quota...) — không
-#     chặn pipeline retrieval, chỉ giảm chất lượng nhánh BM25 tạm thời.
-#     """
-#     llm = llm or _get_llm()
-#     prompt = f"""Trích 3-6 từ khóa PHÁP LÝ (tên luật, loại văn bản, khái niệm pháp lý cụ thể —
-# không lấy từ khóa mô tả tình huống cá nhân như số tiền, tên công ty).
-# Chỉ trả từ khóa, cách nhau bởi dấu cách.
-
-# Câu hỏi: {question}"""
-#     try:
-#         response = llm.invoke(prompt)
-#         keywords = response.content if hasattr(response, "content") else str(response)
-#         return keywords.strip()
-#     except Exception:
-#         return question
 
 import traceback
 def extract_legal_keywords(question: str, llm=None) -> str:

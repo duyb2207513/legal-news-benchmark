@@ -16,6 +16,7 @@ import ast
 import pandas as pd
 
 from benchmark.deepeval_judge import score_with_deepeval
+from benchmark.ragas_judge import score_with_ragas
 from benchmark.eval_set import load_eval_set
 from retrieval.pipeline import run_pipeline
 
@@ -88,6 +89,7 @@ def _run_one_question(
     modes: list[str],
     include_reason: bool = False,
     precomputed: dict[str, dict[str, dict]] | None = None,
+    with_ragas: bool = False,
 ) -> list[dict]:
     """Chạy tuần tự tất cả mode cho 1 câu hỏi, trả list row (1 row/mode).
 
@@ -113,7 +115,7 @@ def _run_one_question(
             result = run_pipeline(question, mode,max_components=5,top_k=5, use_rerank=False)
         deepeval_scores = score_with_deepeval(result, include_reason=include_reason)
 
-        rows.append({
+        row = {
             "question": question,
             "category": item.get("category"),
             "mode": mode,
@@ -127,7 +129,21 @@ def _run_one_question(
             "_answer_relevancy_reason": deepeval_scores.get("answer_relevancy_reason"),
             "_faithfulness_reason": deepeval_scores.get("faithfulness_deepeval_reason"),
             "_contextual_relevancy_reason": deepeval_scores.get("contextual_relevancy_reason"),
-        })
+        }
+
+        if with_ragas:
+            # gold_answer tuỳ chọn trong EVAL_SET -> tự bật thêm
+            # context_recall/answer_correctness, bỏ qua (None) nếu không có
+            ragas_scores = score_with_ragas(result, gold_answer=item.get("gold_answer"))
+            row.update({
+                "faithfulness_ragas": ragas_scores.get("faithfulness_ragas"),
+                "answer_relevancy_ragas": ragas_scores.get("answer_relevancy_ragas"),
+                "context_precision_ragas": ragas_scores.get("context_precision_ragas"),
+                "context_recall_ragas": ragas_scores.get("context_recall_ragas"),
+                "answer_correctness_ragas": ragas_scores.get("answer_correctness_ragas"),
+            })
+
+        rows.append(row)
     return rows
 
 
@@ -137,6 +153,7 @@ def run_benchmark(
     max_workers: int = DEFAULT_MAX_WORKERS,
     include_reason: bool = False,
     precomputed: dict[str, dict[str, dict]] | None = None,
+    with_ragas: bool = False,
 ) -> pd.DataFrame:
     """Chạy run_pipeline() cho mỗi (câu hỏi, mode), chấm bằng DeepEval, trả
     DataFrame 1 dòng/(câu hỏi, mode).
@@ -160,7 +177,7 @@ def run_benchmark(
     rows: list[dict] = []
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = {
-            ex.submit(_run_one_question, item, modes, include_reason, precomputed): item
+            ex.submit(_run_one_question, item, modes, include_reason, precomputed, with_ragas): item
             for item in eval_set
         }
         for future in as_completed(futures):
@@ -175,11 +192,17 @@ def run_benchmark(
 
 
 def summarize(df_results: pd.DataFrame) -> pd.DataFrame:
-    """Trung bình các metric số theo mode — bảng chính để so sánh 4 mode."""
-    return df_results.groupby("mode")[[
+    """Trung bình các metric số theo mode — bảng chính để so sánh các mode."""
+    cols = [
         "answer_relevancy", "faithfulness_deepeval", "contextual_relevancy",
         "context_len_chars", "prompt_tokens", "latency_sec",
-    ]].mean(numeric_only=True).round(3)
+    ]
+    ragas_cols = [
+        "faithfulness_ragas", "answer_relevancy_ragas", "context_precision_ragas",
+        "context_recall_ragas", "answer_correctness_ragas",
+    ]
+    cols += [c for c in ragas_cols if c in df_results.columns]
+    return df_results.groupby("mode")[cols].mean(numeric_only=True).round(3)
 
 
 def summarize_by_category(df_results: pd.DataFrame) -> pd.DataFrame | None:
@@ -208,6 +231,13 @@ def main() -> None:
              "CSV) — tốn thêm ~1 lần gọi LLM/metric/câu hỏi. Mặc định tắt.",
     )
     parser.add_argument(
+        "--with-ragas", action="store_true",
+        help="Chấm thêm bằng RAGAS (faithfulness, answer_relevancy, "
+             "context_precision — không cần ground truth; context_recall, "
+             "answer_correctness tự bật thêm nếu EVAL_SET có 'gold_answer'). "
+             "Tốn thêm lệnh gọi LLM/embedding nên mặc định tắt.",
+    )
+    parser.add_argument(
         "--precomputed", nargs="+", default=[], metavar="MODE=PATH",
         help="Dùng kết quả run_pipeline() đã chạy sẵn, lưu ở CSV, thay vì "
              "chạy lại retrieval cho mode đó. Truyền dạng mode=path, có thể "
@@ -230,6 +260,7 @@ def main() -> None:
     df_results = run_benchmark(
         eval_set, args.modes, max_workers=args.max_workers,
         include_reason=args.include_reason, precomputed=precomputed,
+        with_ragas=args.with_ragas,
     )
     summary = summarize(df_results)
 

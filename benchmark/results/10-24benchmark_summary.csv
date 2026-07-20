@@ -1,2 +1,0 @@
-﻿mode,answer_relevancy,faithfulness_deepeval,contextual_relevancy,context_len_chars,prompt_tokens,latency_sec
-vector,0.955,0.992,0.112,8384.933,3279.267,12.84

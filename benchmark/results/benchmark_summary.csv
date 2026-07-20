@@ -1,3 +1,0 @@
-﻿mode,answer_relevancy,faithfulness_deepeval,contextual_relevancy,context_len_chars,prompt_tokens,latency_sec
-graphrag,0.652,0.967,0.316,6080.85,2443.8,12.298
-vector_graph,0.77,0.956,0.321,6113.6,2454.7,11.43

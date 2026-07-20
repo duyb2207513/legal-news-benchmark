@@ -67,8 +67,6 @@ def merge_search_results(
         row["best_rank"] = best_rank[comp_id]
         merged.append(row)
 
-    # merged.sort(key=lambda r: (r.get("validity_status") != "Còn hiệu lực", -r["score"], r["best_rank"]))
-
     filtered, seen = [], set()
     for row in merged:
         key = (row.get("norm_id"), row.get("citation"))

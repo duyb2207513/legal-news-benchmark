@@ -121,7 +121,7 @@ def bm25_search(question: str, top_k: int = TOP_K) -> list[dict]:
     cleaned = _SPECIAL_CHARS_RE.sub(" ", question)
 
     with ix.searcher(weighting=scoring.BM25F()) as searcher:
-        qp = QueryParser("text", schema=ix.schema, group=OrGroup)
+        qp   = QueryParser("text", schema=ix.schema, group=OrGroup)
         q = qp.parse(cleaned)
         hits = searcher.search(q, limit=top_k)
         results = []

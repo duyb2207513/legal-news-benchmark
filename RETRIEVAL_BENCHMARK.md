@@ -94,7 +94,7 @@ Có **5 mode retrieval**:
 - **Input:** nhiều list kết quả (mỗi list đã sort theo score giảm dần) — ví dụ `vector_search()` và `bm25_search()`; `weights` là trọng số áp cho từng nguồn theo đúng thứ tự truyền vào.
 - **Output:** 1 danh sách hợp nhất, mỗi dòng có thêm `rrf_score` (cũng được gán vào `score`), `original_score` (score gốc của dòng đại diện, giữ lại để debug — không dùng để sort/so sánh), `best_rank`, đã loại trùng theo `(norm_id, citation)` (giữ dòng có `rrf_score` cao nhất).
 - **Ý nghĩa:** Reciprocal Rank Fusion có trọng số — công thức `rrf(row) = Σ weight_i / (k + rank_i)` qua các nguồn chứa row đó. Dùng RANK (thứ hạng) thay vì raw score vì cosine similarity (vector) và BM25F score không cùng thang đo, so sánh trực tiếp sẽ thiên vị BM25 (score luôn lớn hơn "giả tạo"). Nguồn đầu tiên (quy ước là `vector_search()`) được nhân trọng số `weights[0]` (mặc định 0.55) và nguồn thứ hai (BM25) nhân `weights[1]` (mặc định 0.45) vì vector search thường có precision cao hơn cho câu hỏi tự nhiên; nguồn dư ngoài `len(weights)` dùng weight=1.0. Dòng đại diện cho mỗi Component chọn theo RANK tốt nhất (nhỏ nhất) trong nguồn của nó, không theo raw score. Kết quả cuối **không** tự sort theo `validity_status` trong hàm này (dòng sort đó đã bị comment trong code) — việc ưu tiên "Còn hiệu lực" được thực hiện ở bước sau, trong `retrieve()` (`pipeline.py`).
-
+<!-- 
 #### `reranker.py` — Rerank theo coverage từ khoá tuyệt đối
 
 - **Hàm:** `rerank(question, seeds, top_n=5, min_score=4.0, llm=None) -> list[dict]`
@@ -103,7 +103,7 @@ Có **5 mode retrieval**:
 - **Ý nghĩa:** RRF chỉ xếp theo rank giữa 2 nguồn, không đánh giá lại độ liên quan ngữ nghĩa thật. Bản cũ dùng self-referential BM25 normalization (chuẩn hoá theo max trong chính tập seeds) nên luôn đẩy 1 candidate lên ~10/10 dù nó lạc đề — không bao giờ lọc sạch được cả tập sai. Bản hiện tại dùng **coverage tuyệt đối có trọng số IDF**, không phụ thuộc các candidate khác:
   - Với mỗi từ khoá trong câu hỏi (`query_terms`, đã loại stopword tiếng Việt), tính `idf(term) = ln((n_docs + 1) / (df(term) + 1)) + 1`, trong đó `df(term)` là số candidate trong `seeds` có chứa từ đó — từ càng hiếm trong tập candidate thì trọng số càng cao.
   - `rerank_score = 10 × Σ idf(t) cho t ∈ (query_terms ∩ doc_terms) / Σ idf(t) cho t ∈ query_terms` (thang 0–10). Nếu tài liệu không chứa từ khoá nào của câu hỏi, `rerank_score = 0` và bị loại (dưới `min_score`) bất kể so với các candidate khác thế nào.
-  - Raw BM25 (`rank_bm25`, coi seeds là mini-corpus) chỉ dùng làm tie-break **phụ** giữa các candidate đã cùng vượt `min_score`, không quyết định pass/fail.
+  - Raw BM25 (`rank_bm25`, coi seeds là mini-corpus) chỉ dùng làm tie-break **phụ** giữa các candidate đã cùng vượt `min_score`, không quyết định pass/fail. -->
 
 #### `graph_expand.py` — Mở rộng seed qua đồ thị
 
